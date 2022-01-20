@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "wordle": {
+      "commandName": "Project",
+      "commandLineArgs": "c:\\main\\projects\\wordle\\words_alpha.txt ___ot aglnmdepsh"
+    }
+  }
+}
