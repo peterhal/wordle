@@ -27,6 +27,11 @@ namespace wordle
         {
             return value.Any(ch => values.Contains(ch));
         }
+
+        static bool containsAll(List<char> values, string value)
+        {
+            return values.All(value.Contains);
+        }
         static void Main(string[] args)
         {
             Console.WriteLine("Hello World!");
@@ -34,7 +39,8 @@ namespace wordle
             var words = File.ReadAllLines(args[0]);
             var template = args[1];
             var excludes = new HashSet<char>(args[2]);
-            foreach (var word in words.Where(word => matchesTemplate(template, word) && !containsAny(excludes, word)))
+            var includes = args.Length >= 4 ? new List<char>(args[3]) : new List<char>();
+            foreach (var word in words.Where(word => matchesTemplate(template, word) && !containsAny(excludes, word) && containsAll(includes, word)))
             {
                 Console.WriteLine(word);
             }
