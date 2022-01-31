@@ -2,7 +2,7 @@
   "profiles": {
     "wordle": {
       "commandName": "Project",
-      "commandLineArgs": "c:\\main\\projects\\wordle\\words_alpha.txt ____[n] stai n"
+      "commandLineArgs": "c:\\main\\projects\\wordle\\words_alpha.txt"
     }
   }
 }
