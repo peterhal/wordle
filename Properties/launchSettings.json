@@ -2,7 +2,7 @@
   "profiles": {
     "wordle": {
       "commandName": "Project",
-      "commandLineArgs": "c:\\main\\projects\\wordle\\words_alpha.txt s__a_ tinpy r"
+      "commandLineArgs": "c:\\main\\projects\\wordle\\words_alpha.txt ____[n] stai n"
     }
   }
 }
