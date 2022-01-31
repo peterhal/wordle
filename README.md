@@ -50,8 +50,7 @@ Here's an example interactive session:
 ```
 Enter your guessed word, followed by the colors returned for your guess.
 Valid colors are b - black; y - yellow; g - green.
->
-stain byybb
+> stain byybb
 abbot
 abdat
 ablet
@@ -63,8 +62,7 @@ zakat
 538
 Enter your guessed word, followed by the colors returned for your guess.
 Valid colors are b - black; y - yellow; g - green.
->
-vocal bybgy
+> vocal bybgy
 bloat
 float
 gloat
@@ -75,8 +73,7 @@ talao
 7
 Enter your guessed word, followed by the colors returned for your guess.
 Valid colors are b - black; y - yellow; g - green.
->
-oblat yyygg
+> oblat yyygg
 bloat
 1
 ```

@@ -80,7 +80,7 @@ namespace wordle {
                 do {
                     Console.WriteLine("Enter your guessed word, followed by the colors returned for your guess.");
                     Console.WriteLine("Valid colors are b - black; y - yellow; g - green.");
-                    Console.WriteLine("> ");
+                    Console.Write("> ");
                     var input = Console.ReadLine();
                     var inputWords = input.Split(" ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                     if (inputWords.Length != 2) {
