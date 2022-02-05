@@ -130,15 +130,18 @@ namespace wordle {
                 var ch = pair.First;
                 switch (pair.Second) {
                     case 'b':
-                        excludes.Add(ch);
-                        compiledTemplate.Add(c => !excludes.Contains(c));
+                        if (includes.Contains(ch)) {
+                            // TODO: This discards the information on the count of 'c's
+                            // In the open indices
+                            compiledTemplate.Add(c => c != ch && !excludes.Contains(c));
+                        } else {
+                            excludes.Add(ch);
+                            compiledTemplate.Add(c => !excludes.Contains(c));
+                        }
                         openIndices.Add(index);
                         break;
                     case 'y':
                         compiledTemplate.Add(c => c != ch && !excludes.Contains(c));
-                        // TODO: This condition does not correctly handle the case where
-                        // there's also a green 'ch' in the guess
-                        // Correct condition is that chars in 'b' guesses must contain ch.
                         includes.Add(ch);
                         openIndices.Add(index);
                         break;
