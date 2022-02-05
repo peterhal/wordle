@@ -12,11 +12,7 @@ namespace wordle {
             return Enumerable.Zip(template, value).All(pair => pair.First(pair.Second));
         }
 
-        static bool ContainsAny(HashSet<char> values, string value) {
-            return value.Any(ch => values.Contains(ch));
-        }
-
-        static bool ContainsAll(List<char> values, string value) {
+        static bool ContainsAll(List<char> values, IEnumerable<char> value) {
             return values.All(value.Contains);
         }
 
@@ -26,25 +22,33 @@ namespace wordle {
         //    x = must be char x
         static Func<string, bool> compileTemplate(string template, HashSet<char> excludes, List<char> includes) {
             var result = new List<Predicate<char>>();
+            var openIndices = new List<int>();
             for (var index = 0; index < template.Length; index++) {
                 var ch = template[index];
                 Predicate<char> predicate;
                 if (ch == '_') {
-                    predicate = c => true;
+                    openIndices.Add(result.Count);
+                    predicate = c => !excludes.Contains(c);
                 } else if (ch == '[') {
+                    openIndices.Add(result.Count);
                     index++;
                     var charExcludes = new List<char>();
                     while (template[index] != ']') {
                         charExcludes.Add(template[index]);
                         index++;
                     }
-                    predicate = c => !charExcludes.Contains(c);
+                    predicate = c => !charExcludes.Contains(c) && !excludes.Contains(c);
                 } else {
                     predicate = c => c == ch;
                 }
                 result.Add(predicate);
             }
-            return WordMatches(result, excludes, includes);
+            return CreateFilter(includes, result, openIndices);
+        }
+
+        private static Func<string, bool> CreateFilter(List<char> includes, List<Predicate<char>> compiledTemplate, List<int> openIndices) {
+            Func<string, IEnumerable<char>> openChars = word => openIndices.Select(i => word[i]);
+            return word => MatchesCompiledTemplate(compiledTemplate, word) && ContainsAll(includes, openChars(word));
         }
 
         static bool IsValidColorChar(char ch) {
@@ -120,19 +124,23 @@ namespace wordle {
             var compiledTemplate = new List<Predicate<char>>();
             var excludes = new HashSet<char>();
             var includes = new List<char>();
+            var openIndices = new List<int>();
+            int index = 0;
             foreach (var pair in Enumerable.Zip(guess, colors)) {
                 var ch = pair.First;
                 switch (pair.Second) {
                     case 'b':
                         excludes.Add(ch);
-                        compiledTemplate.Add(c => true);
+                        compiledTemplate.Add(c => !excludes.Contains(c));
+                        openIndices.Add(index);
                         break;
                     case 'y':
-                        compiledTemplate.Add(c => c != ch);
+                        compiledTemplate.Add(c => c != ch && !excludes.Contains(c));
                         // TODO: This condition does not correctly handle the case where
                         // there's also a green 'ch' in the guess
                         // Correct condition is that chars in 'b' guesses must contain ch.
                         includes.Add(ch);
+                        openIndices.Add(index);
                         break;
                     case 'g':
                         compiledTemplate.Add(c => c == ch);
@@ -140,8 +148,9 @@ namespace wordle {
                     default:
                         throw new Exception("Unexpected color");
                 }
+                index++;
             }
-            return WordMatches(compiledTemplate, excludes, includes);
+            return CreateFilter(includes, compiledTemplate, openIndices);
         }
 
         private static void PrintResults(List<string> results) {
@@ -153,10 +162,6 @@ namespace wordle {
 
         private static List<string> GetResults(List<string> words, Func<string, bool> filter) {
             return words.Where(filter).ToList();
-        }
-
-        private static Func<string, bool> WordMatches(List<Predicate<char>> compiledTemplate, HashSet<char> excludes, List<char> includes) {
-            return word => MatchesCompiledTemplate(compiledTemplate, word) && !ContainsAny(excludes, word) && ContainsAll(includes, word);
         }
     }
 }
