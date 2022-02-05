@@ -5,13 +5,6 @@ using System.Collections.Generic;
 
 namespace wordle {
     class Program {
-        static bool MatchesTemplate(string template, string value) {
-            if (template.Length != value.Length) {
-                return false;
-            }
-            return Enumerable.Zip(template, value).All(pair => pair.First == pair.Second || pair.First == '_');
-        }
-
         static bool MatchesCompiledTemplate(List<Predicate<char>> template, string value) {
             if (template.Count != value.Length) {
                 return false;
@@ -31,7 +24,7 @@ namespace wordle {
         //    _ = any character
         //    [<chars>] = not any of <chars>
         //    x = must be char x
-        static List<Predicate<char>> compileTemplate(string template) {
+        static Func<string, bool> compileTemplate(string template, HashSet<char> excludes, List<char> includes) {
             var result = new List<Predicate<char>>();
             for (var index = 0; index < template.Length; index++) {
                 var ch = template[index];
@@ -40,18 +33,18 @@ namespace wordle {
                     predicate = c => true;
                 } else if (ch == '[') {
                     index++;
-                    var excludes = new List<char>();
+                    var charExcludes = new List<char>();
                     while (template[index] != ']') {
-                        excludes.Add(template[index]);
+                        charExcludes.Add(template[index]);
                         index++;
                     }
-                    predicate = c => !excludes.Contains(c);
+                    predicate = c => !charExcludes.Contains(c);
                 } else {
                     predicate = c => c == ch;
                 }
                 result.Add(predicate);
             }
-            return result;
+            return WordMatches(result, excludes, includes);
         }
 
         static bool IsValidColorChar(char ch) {
@@ -66,10 +59,10 @@ namespace wordle {
 
             if (args.Length == 4) {
                 var template = args[1];
-                var compiledTemplate = compileTemplate(template);
                 var excludes = new HashSet<char>(args[2]);
                 var includes = args.Length >= 4 ? new List<char>(args[3]) : new List<char>();
-                var results = GetResults(words, compiledTemplate, excludes, includes);
+                var filter = compileTemplate(template, excludes, includes);
+                var results = GetResults(words, filter);
                 PrintResults(results);
             } else if (args.Length == 1) {
                 // interactive mode
@@ -107,8 +100,8 @@ namespace wordle {
                             continue;
                         } else {
                             // valid input!
-                            CompileInteractiveInput(guess, colors, out List<Predicate<char>> compiledTemplate, out HashSet<char> excludes, out List<char> includes);
-                            possibleWords = GetResults(possibleWords, compiledTemplate, excludes, includes);
+                            var filter = CompileInteractiveInput(guess, colors);
+                            possibleWords = GetResults(possibleWords, filter);
                             PrintResults(possibleWords);
                         }
 
@@ -123,10 +116,10 @@ namespace wordle {
             return 0;
         }
 
-        private static void CompileInteractiveInput(string guess, string colors, out List<Predicate<char>> compiledTemplate, out HashSet<char> excludes, out List<char> includes) {
-            compiledTemplate = new List<Predicate<char>>();
-            excludes = new HashSet<char>();
-            includes = new List<char>();
+        private static Func<string, bool> CompileInteractiveInput(string guess, string colors) {
+            var compiledTemplate = new List<Predicate<char>>();
+            var excludes = new HashSet<char>();
+            var includes = new List<char>();
             foreach (var pair in Enumerable.Zip(guess, colors)) {
                 var ch = pair.First;
                 switch (pair.Second) {
@@ -148,6 +141,7 @@ namespace wordle {
                         throw new Exception("Unexpected color");
                 }
             }
+            return WordMatches(compiledTemplate, excludes, includes);
         }
 
         private static void PrintResults(List<string> results) {
@@ -157,8 +151,12 @@ namespace wordle {
             Console.WriteLine(results.Count);
         }
 
-        private static List<string> GetResults(List<string> words, List<Predicate<char>> compiledTemplate, HashSet<char> excludes, List<char> includes) {
-            return words.Where(word => MatchesCompiledTemplate(compiledTemplate, word) && !ContainsAny(excludes, word) && ContainsAll(includes, word)).ToList();
+        private static List<string> GetResults(List<string> words, Func<string, bool> filter) {
+            return words.Where(filter).ToList();
+        }
+
+        private static Func<string, bool> WordMatches(List<Predicate<char>> compiledTemplate, HashSet<char> excludes, List<char> includes) {
+            return word => MatchesCompiledTemplate(compiledTemplate, word) && !ContainsAny(excludes, word) && ContainsAll(includes, word);
         }
     }
 }
