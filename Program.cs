@@ -7,52 +7,6 @@ using System.Net;
 
 namespace wordle {
     class Program {
-        static bool MatchesCompiledTemplate(List<Predicate<char>> template, string value) {
-            if (template.Count != value.Length) {
-                return false;
-            }
-            return Enumerable.Zip(template, value).All(pair => pair.First(pair.Second));
-        }
-
-        static bool ContainsAll(List<char> values, IEnumerable<char> value) {
-            return values.All(value.Contains);
-        }
-
-        // Template syntax:
-        //    _ = any character
-        //    [<chars>] = not any of <chars>
-        //    x = must be char x
-        static Func<string, bool> compileTemplate(string template, HashSet<char> excludes, List<char> includes) {
-            var result = new List<Predicate<char>>();
-            var openIndices = new List<int>();
-            for (var index = 0; index < template.Length; index++) {
-                var ch = template[index];
-                Predicate<char> predicate;
-                if (ch == '_') {
-                    openIndices.Add(result.Count);
-                    predicate = c => !excludes.Contains(c);
-                } else if (ch == '[') {
-                    openIndices.Add(result.Count);
-                    index++;
-                    var charExcludes = new List<char>();
-                    while (template[index] != ']') {
-                        charExcludes.Add(template[index]);
-                        index++;
-                    }
-                    predicate = c => !charExcludes.Contains(c) && !excludes.Contains(c);
-                } else {
-                    predicate = c => c == ch;
-                }
-                result.Add(predicate);
-            }
-            return CreateFilter(includes, result, openIndices);
-        }
-
-        private static Func<string, bool> CreateFilter(List<char> includes, List<Predicate<char>> compiledTemplate, List<int> openIndices) {
-            Func<string, IEnumerable<char>> openChars = word => openIndices.Select(i => word[i]);
-            return word => MatchesCompiledTemplate(compiledTemplate, word) && ContainsAll(includes, openChars(word));
-        }
-
         static bool IsValidColorChar(char ch) {
             switch (ch) {
                 case 'b': case 'y': case 'g': return true;
@@ -67,64 +21,53 @@ namespace wordle {
             var validGuesses = File.ReadAllLines(args[1]).ToList();
             var allValidGuesses = Enumerable.Concat(words, validGuesses).ToList();
 
-            if (args.Length == 5) {
-                var template = args[2];
-                var excludes = new HashSet<char>(args[3]);
-                var includes = args.Length >= 4 ? new List<char>(args[4]) : new List<char>();
-                var filter = compileTemplate(template, excludes, includes);
-                var results = GetResults(words, filter);
-                PrintResults(results);
-            } else if (args.Length == 2) {
-                // interactive mode
-                var guesses = new List<Tuple<string, string>>();
-                int wordLength = 5;
-                var possibleWords = words.ToList();
-                PrintResults(possibleWords);
-                PrintBestGuesses(allValidGuesses, possibleWords);
-                do {
+            // interactive mode
+            var guesses = new List<Tuple<string, string>>();
+            int wordLength = 5;
+            var possibleWords = words.ToList();
+            PrintResults(possibleWords);
+            PrintBestGuesses(allValidGuesses, possibleWords);
+            do {
 
-                    Console.WriteLine("Enter your guessed word, followed by the colors returned for your guess.");
-                    Console.WriteLine("Valid colors are b - black; y - yellow; g - green.");
-                    Console.Write("> ");
-                    var input = Console.ReadLine();
-                    var inputWords = input.Split(" ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                    if (inputWords.Length != 2) {
-                        Console.WriteLine($"Invalid input: Input must have exactly 2 entries; found {inputWords.Length}.");
+                Console.WriteLine("Enter your guessed word, followed by the colors returned for your guess.");
+                Console.WriteLine("Valid colors are b - black; y - yellow; g - green.");
+                Console.Write("> ");
+                var input = Console.ReadLine();
+                var inputWords = input.Split(" ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (inputWords.Length != 2) {
+                    Console.WriteLine($"Invalid input: Input must have exactly 2 entries; found {inputWords.Length}.");
+                    continue;
+                } else if (inputWords[0] is var guess && inputWords[1] is var colors && guess.Length != colors.Length) {
+                    Console.WriteLine($"Invalid input: Each entry must be same length. Got {guess.Length} and {colors.Length}");
+                    continue;
+                } else {
+                    if (wordLength != guess.Length) {
+                        Console.WriteLine($"Invalid guess: Each guess must have the same length. This guess has {guess.Length} chars, previous guess had {wordLength} chars.");
                         continue;
-                    } else if (inputWords[0] is var guess && inputWords[1] is var colors && guess.Length != colors.Length) {
-                        Console.WriteLine($"Invalid input: Each entry must be same length. Got {guess.Length} and {colors.Length}");
+                    } else if (!allValidGuesses.Contains(guess)) {
+                        Console.WriteLine($"Invalid guess: Guess word {guess} is not a valid word in the dictionary.");
+                        continue;
+                    } else if (!colors.All(IsValidColorChar)) {
+                        Console.WriteLine($"Invalid color: Second word in input must contain only valid colors (b, y, g). Found '{new String(colors.Where(ch => !IsValidColorChar(ch)).ToArray())}'");
                         continue;
                     } else {
-                        if (wordLength != guess.Length) {
-                            Console.WriteLine($"Invalid guess: Each guess must have the same length. This guess has {guess.Length} chars, previous guess had {wordLength} chars.");
-                            continue;
-                        } else if (!allValidGuesses.Contains(guess)) {
-                            Console.WriteLine($"Invalid guess: Guess word {guess} is not a valid word in the dictionary.");
-                            continue;
-                        } else if (!colors.All(IsValidColorChar)) {
-                            Console.WriteLine($"Invalid color: Second word in input must contain only valid colors (b, y, g). Found '{new String(colors.Where(ch => !IsValidColorChar(ch)).ToArray())}'");
-                            continue;
-                        } else {
-                            // valid input!
-                            var filter = CompileInteractiveInput(guess, colors);
-                            possibleWords = GetResults(possibleWords, filter);
-                            PrintResults(possibleWords);
-                            PrintBestGuesses(allValidGuesses, possibleWords);
-                        }
-
+                        // valid input!
+                        var filter = FilterOfGuess(guess, colors);
+                        possibleWords = GetResults(possibleWords, filter);
+                        PrintResults(possibleWords);
+                        PrintBestGuesses(allValidGuesses, possibleWords);
                     }
 
-                } while (possibleWords.Count > 1);
-                Console.Write("Hit enter to exit.");
-                Console.ReadLine();
-            } else {
-                Console.Error.WriteLine("Usage: wordle <dictionary> <template> <excludes> <includes>");
-                return 1;
-            }
+                }
+
+            } while (possibleWords.Count > 1);
+            Console.Write("Hit enter to exit.");
+            Console.ReadLine();
+
             return 0;
         }
 
-        private static Func<string, bool> CompileInteractiveInput(string guess, string colors) {
+        private static Func<string, bool> FilterOfGuess(string guess, string colors) {
             return actual => GetColorsOfGuess(guess, actual) == colors;
         }
 
@@ -144,8 +87,9 @@ namespace wordle {
             foreach (var pair in Enumerable.Zip(guess, actual)) {
                 var ch = pair.Second;
                 if (pair.First != ch) {
-                    actualCounts.TryAdd(ch, 0);
-                    actualCounts[ch] += 1;
+                    actualCounts.TryGetValue(ch, out int actualCount);
+                    actualCount += 1;
+                    actualCounts[ch] = actualCount;
                 }
             }
 
@@ -155,11 +99,13 @@ namespace wordle {
                 char rch;
                 if (g == pair.Second) {
                     rch = 'g';
-                } else if (actualCounts.ContainsKey(g) && actualCounts[g] > 0) {
-                    actualCounts[g] -= 1;
-                    rch = 'y';
                 } else {
-                    rch = 'b';
+                    if (actualCounts.TryGetValue(g, out int actualCount) && actualCount > 0) {
+                        actualCounts[g] = actualCount - 1;
+                        rch = 'y';
+                    } else {
+                        rch = 'b';
+                    }
                 }
                 result.Append(rch);
             }
