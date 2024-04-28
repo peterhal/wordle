@@ -125,39 +125,7 @@ namespace wordle {
         }
 
         private static Func<string, bool> CompileInteractiveInput(string guess, string colors) {
-            var compiledTemplate = new List<Predicate<char>>();
-            var excludes = new HashSet<char>();
-            var includes = new List<char>();
-            var openIndices = new List<int>();
-            int index = 0;
-            foreach (var pair in Enumerable.Zip(guess, colors)) {
-                var ch = pair.First;
-                switch (pair.Second) {
-                    case 'b':
-                        if (includes.Contains(ch)) {
-                            // TODO: This discards the information on the count of 'c's
-                            // In the open indices
-                            compiledTemplate.Add(c => c != ch && !excludes.Contains(c));
-                        } else {
-                            excludes.Add(ch);
-                            compiledTemplate.Add(c => !excludes.Contains(c));
-                        }
-                        openIndices.Add(index);
-                        break;
-                    case 'y':
-                        compiledTemplate.Add(c => c != ch && !excludes.Contains(c));
-                        includes.Add(ch);
-                        openIndices.Add(index);
-                        break;
-                    case 'g':
-                        compiledTemplate.Add(c => c == ch);
-                        break;
-                    default:
-                        throw new Exception("Unexpected color");
-                }
-                index++;
-            }
-            return CreateFilter(includes, compiledTemplate, openIndices);
+            return actual => GetColorsOfGuess(guess, actual) == colors;
         }
 
         private static void PrintResults(List<string> results) {
@@ -171,24 +139,24 @@ namespace wordle {
             return words.Where(filter).ToList();
         }
 
-        private static string GetColorsOfGuess(string actual, string guess) {
-            var counts = new Dictionary<char, int>();
-            foreach (var pair in Enumerable.Zip(actual, guess)) {
+        private static string GetColorsOfGuess(string guess, string actual) {
+            var actualCounts = new Dictionary<char, int>();
+            foreach (var pair in Enumerable.Zip(guess, actual)) {
                 var ch = pair.Second;
                 if (pair.First != ch) {
-                    counts.TryAdd(ch, 0);
-                    counts[ch] += 1;
+                    actualCounts.TryAdd(ch, 0);
+                    actualCounts[ch] += 1;
                 }
             }
 
             var result = new StringBuilder();
-            foreach (var pair in Enumerable.Zip(actual, guess)) {
-                var ac = pair.First;
+            foreach (var pair in Enumerable.Zip(guess, actual)) {
+                var g = pair.First;
                 char rch;
-                if (ac == pair.Second) {
+                if (g == pair.Second) {
                     rch = 'g';
-                } else if (counts.ContainsKey(ac) && counts[ac] > 0) {
-                    counts[ac] -= 1;
+                } else if (actualCounts.ContainsKey(g) && actualCounts[g] > 0) {
+                    actualCounts[g] -= 1;
                     rch = 'y';
                 } else {
                     rch = 'b';
